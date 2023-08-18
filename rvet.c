@@ -6,26 +6,27 @@ typedef struct Clock {
     int p[3];
 } Clock;
 
+// Incrementa o clock
 void Event(int pid, Clock *clock) {
     clock->p[pid]++;
 }
 
 void Send(int sender_pid, int receiver_pid, Clock *clock) {
-    Event(sender_pid, clock);
-    printf("P%d (%d, %d, %d)\n", sender_pid, clock->p[0], clock->p[1], clock->p[2]);
-    MPI_Send(clock, sizeof(Clock), MPI_BYTE, receiver_pid, 0, MPI_COMM_WORLD);
+    clock->p[sender_pid]++; // Incrementa o clock do processo que manda
+    printf("P%d (%d, %d, %d)\n", sender_pid, clock->p[0], clock->p[1], clock->p[2]); // Imprimindo o clock do processo que manda
+    MPI_Send(clock, sizeof(Clock), MPI_BYTE, receiver_pid, 0, MPI_COMM_WORLD); // envia para o processo que irar receber (receiver_pid)
 }
 
 void Receive(int sender_pid, int receiver_pid, Clock *clock) {
-    Clock received_clock;
-    MPI_Recv(&received_clock, sizeof(Clock), MPI_BYTE, sender_pid, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-
-    for (int i = 0; i < 3; i++) {
-        clock->p[i] = (clock->p[i] > received_clock.p[i]) ? clock->p[i] : received_clock.p[i];
+    Clock received_clock; // Clock auxiliar para o processo que recebe
+    MPI_Recv(&received_clock, sizeof(Clock), MPI_BYTE, sender_pid, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE); // recebe do processo que mandou (sender_pid), e armazena no received_clock
+    
+    for (int i = 0; i < 3; i++) { // compara o clock local com o que foi recebido
+        clock->p[i] = (clock->p[i] > received_clock.p[i]) ? clock->p[i] : received_clock.p[i]; // se o clock recebido for maior que o clock local ele substitui pelo clock recebido
     }
-
-    Event(receiver_pid, clock);
-    printf("P%d (%d, %d, %d)\n", receiver_pid, clock->p[0], clock->p[1], clock->p[2]);
+    
+    clock->p[receiver_pid]++; // Incrementa o clock do processo que recebe (receiver_pid)
+    printf("P%d (%d, %d, %d)\n", receiver_pid, clock->p[0], clock->p[1], clock->p[2]); // Imprime o clock do que recebe
 }
 
 void process0() {
@@ -47,13 +48,10 @@ void process0() {
 
 void process1() {
     Clock clock = {{0, 0, 0}};
-    
 
     Send(1, 0, &clock);
     Receive(0, 1, &clock);
     Receive(0, 1, &clock);
-
-
 }
 
 void process2() {
@@ -63,9 +61,6 @@ void process2() {
     printf("P%d (%d, %d, %d)\n", 2, clock.p[0], clock.p[1], clock.p[2]);
     Send(2, 0, &clock);
     Receive(0, 2, &clock);
-
-    
-
 }
 
 int main(void) {
